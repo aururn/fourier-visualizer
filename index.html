@@ -301,7 +301,14 @@
   <p class="lead">
     スペクトルにマスク \(H(u,v)\) を掛けてから逆変換すると、画像のぼかし(ローパス)やエッジ抽出(ハイパス)ができます。
     スライダーを動かすとリアルタイムで結果が変わります。
+    <b>※縞模様のような単純な画像では効果がほぼ見えません</b>(成分が数点しかないため)。スマイリーや文字、アップロードした写真のような「エッジの多い画像」で試すのがおすすめです。
   </p>
+  <div class="controls">
+    <span class="legend">▶ ワンクリックデモ(スマイリーに切替えて実演):</span>
+    <button id="demoBlur">🌫 ぼかし(ローパス)</button>
+    <button id="demoEdge">✏️ エッジ検出(ハイパス)</button>
+    <button id="demoSharp">🔪 シャープ化(高周波強調)</button>
+  </div>
   <div class="formula">
     $$g(x,y) = \mathcal{F}^{-1}\Big[\, H(u,v) \cdot F(u,v) \,\Big]$$
     <div class="cap" id="filterFormulaCap"></div>
@@ -339,6 +346,33 @@
     </div>
   </div>
   <div id="filterHint" class="note"></div>
+
+  <h3>空間領域で見ると:畳み込み定理</h3>
+  <p class="lead">
+    周波数領域での「掛け算」は、空間領域での「畳み込み」と完全に等価です。
+    マスク \(H\) を逆フーリエ変換すると、画像の上を滑らせる<b>畳み込みカーネル \(h(x,y)\)</b>(ぼかしの形そのもの)が現れます。
+    ローパス=「ぼかしカーネルとの畳み込み」、ハイパス=「中心が正・周囲が負のカーネルとの畳み込み(=エッジ検出オペレータ)」であることが見て取れます。
+  </p>
+  <div class="formula">
+    $$g(x,y) = \mathcal{F}^{-1}\big[\,H \cdot F\,\big] = (h * f)(x,y), \qquad h(x,y) = \mathcal{F}^{-1}\big[H(u,v)\big]$$
+    <div class="cap">畳み込み定理:理想ローパスのカーネルに波紋(sinc)が出ること、ガウシアンならきれいなぼかし玉になることに注目。</div>
+  </div>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvConvF" width="128" height="128"></canvas>
+      <div class="cap"><b>元画像 f(x, y)</b></div>
+    </div>
+    <div class="arrow">∗<br><small style="font-size:11px;">畳み込み</small></div>
+    <div class="canvas-box">
+      <canvas id="cvConvH" width="128" height="128"></canvas>
+      <div class="cap"><b>カーネル h(x, y) = F⁻¹[H]</b><br>白=正 / 黒=負(対数強調表示)</div>
+    </div>
+    <div class="arrow">=</div>
+    <div class="canvas-box">
+      <canvas id="cvConvG" width="128" height="128"></canvas>
+      <div class="cap"><b>結果 g(x, y)(④と同じ)</b></div>
+    </div>
+  </div>
 </section>
 
 <!-- ============ ⑥ 逐次再構成 ============ -->
@@ -539,7 +573,9 @@ const samples = [
   { name: "矩形", hint: "矩形のスペクトルは縦横に伸びる <b>sinc 関数の十字</b>。エッジに垂直な方向へ高周波成分が伸びるのがポイントです。",
     gen: (x, y) => (Math.abs(x - HALF) < 18 && Math.abs(y - HALF) < 30) ? 1 : 0 },
   { name: "スマイリー", hint: "輪郭・目・口など様々な向きのエッジを持つ「絵」。スペクトルは中央に強く集中しつつ、各エッジに垂直な方向へ成分が伸びます。フィルタ実験(⑤)に最適。",
-    gen: null }, // canvas で描く
+    draw: () => genSmiley() },
+  { name: "文字「FFT」", hint: "文字はあらゆる向きの<b>鋭いエッジ</b>を持つため、高周波成分が豊富です。⑤でローパス(ぼかして読めなくなる)/ハイパス(輪郭だけ残る)を試すと効果が最も分かりやすい画像です。",
+    draw: () => genText() },
   { name: "ランダムノイズ", hint: "ホワイトノイズは<b>全周波数をほぼ均等に</b>含みます。スペクトルが一様にざらつくことを確認してください。ローパスフィルタによる平滑化も試せます。",
     gen: (x, y) => Math.random() },
 ];
@@ -558,6 +594,23 @@ function genSmiley() {
   g.beginPath(); g.arc(64, 66, 24, 0.25 * Math.PI, 0.75 * Math.PI); g.stroke();
   g.fillStyle = "#fff";
   g.fillRect(8, 104, 50, 6);   // アクセントの線(エッジ成分)
+  const d = g.getImageData(0, 0, N, N).data;
+  const out = new Float64Array(N2);
+  for (let i = 0; i < N2; i++) out[i] = d[i * 4] / 255;
+  return out;
+}
+
+function genText() {
+  const c = document.createElement("canvas");
+  c.width = N; c.height = N;
+  const g = c.getContext("2d");
+  g.fillStyle = "#181818"; g.fillRect(0, 0, N, N);
+  g.fillStyle = "#f0f0f0";
+  g.font = "bold 52px sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText("FFT", 64, 46);
+  g.font = "bold 34px sans-serif";
+  g.fillText("2D", 64, 96);
   const d = g.getImageData(0, 0, N, N).data;
   const out = new Float64Array(N2);
   for (let i = 0; i < N2; i++) out[i] = d[i * 4] / 255;
@@ -606,7 +659,7 @@ samples.forEach((s, idx) => {
     [...sampleBtnsDiv.children].forEach(x => x.classList.remove("sel"));
     b.classList.add("sel");
     let data;
-    if (s.gen === null) data = genSmiley();
+    if (s.draw) data = s.draw();
     else {
       data = new Float64Array(N2);
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) data[y * N + x] = s.gen(x, y);
@@ -872,6 +925,10 @@ const filters = [
     tex: "H(u,v)=\\begin{cases}1 & |D(u,v)-D_0|\\le W/2\\\\ 0 & \\text{otherwise}\\end{cases}",
     hint: "特定の細かさの模様だけを取り出します。市松模様などで「特定の高調波だけ残す」実験をすると面白いです。",
     h: (d, d0, w) => Math.abs(d - d0) <= w / 2 ? 1 : 0 },
+  { key: "sharp", name: "シャープ化(高周波強調)", needBand: false,
+    tex: "H(u,v)=1+1.5\\left(1-e^{-D^2(u,v)/2D_0^2}\\right)",
+    hint: "低周波はそのまま(H=1)通しつつ、高周波だけを増幅(H>1)すると<b>エッジが強調されてくっきり</b>します。写真の「シャープネス」処理(アンシャープマスキング)の原理です。",
+    h: (d, d0, w) => 1 + 1.5 * (1 - Math.exp(-(d * d) / (2 * d0 * d0))) },
 ];
 let curFilter = filters[0];
 
@@ -912,10 +969,26 @@ function updateFilter() {
     gRe[k] = Fre[k] * h; gIm[k] = Fim[k] * h;
   }
   drawLogMag(ctxOf("cvFiltSpec"), Fre, Fim, true);
-  drawGray(ctxOf("cvFiltMask"), mask, 0, 1);
+  drawGray(ctxOf("cvFiltMask"), mask);  // 自動正規化(シャープ化では H>1 になるため)
   drawLogMag(ctxOf("cvFiltApplied"), gRe, gIm, true);
   fft2d(gRe, gIm, true);
   drawGray(ctxOf("cvFiltResult"), gRe);
+
+  // ---- 空間領域ビュー(畳み込み定理)----
+  // マスク H を逆FFT → 畳み込みカーネル h(x,y)
+  const hRe = new Float64Array(N2), hIm = new Float64Array(N2);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++)
+    hRe[shiftIdx(i, j)] = mask[j * N + i];
+  fft2d(hRe, hIm, true);
+  // 中心に来るようシフト + 符号付き対数強調(負のローブも見えるように)
+  const psf = new Float64Array(N2);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const v = hRe[shiftIdx(i, j)];
+    psf[j * N + i] = Math.sign(v) * Math.log(1 + 3e4 * Math.abs(v));
+  }
+  drawGray(ctxOf("cvConvH"), psf);
+  drawGray(ctxOf("cvConvF"), img, 0, 1);
+  drawGray(ctxOf("cvConvG"), gRe);
 
   // 数式とヒント
   const cap = document.getElementById("filterFormulaCap");
@@ -927,6 +1000,20 @@ function updateFilter() {
   else texEl.textContent = tex;
   document.getElementById("filterHint").innerHTML = "🔍 " + curFilter.hint;
 }
+
+// ワンクリックデモ:スマイリーに切替え → フィルタ・半径を設定
+function runFilterDemo(filterKey, d0) {
+  const smileyIdx = samples.findIndex(s => s.name === "スマイリー");
+  sampleBtnsDiv.children[smileyIdx].click();
+  const fi = filters.findIndex(f => f.key === filterKey);
+  filterBtnsDiv.children[fi].click();
+  document.getElementById("cutoffRange").value = d0;
+  updateFilter();
+  document.getElementById("sec-filter").scrollIntoView({ behavior: "smooth" });
+}
+document.getElementById("demoBlur").onclick = () => runFilterDemo("glp", 8);
+document.getElementById("demoEdge").onclick = () => runFilterDemo("ghp", 10);
+document.getElementById("demoSharp").onclick = () => runFilterDemo("sharp", 20);
 
 // ===================== ⑥ 逐次再構成 =====================
 let reconAnim = null;
