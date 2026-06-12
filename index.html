@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>画像フーリエ変換 ビジュアル学習アプリ</title>
+<!-- KaTeX (数式描画) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --card2: #1c2330;
+    --border: #2d3748;
+    --text: #e6edf3;
+    --sub: #9aa7b8;
+    --accent: #4da3ff;
+    --accent2: #ff8c4d;
+    --green: #3fb950;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(13,17,23,0.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+  header h1 span { color: var(--accent); }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a {
+    color: var(--sub); text-decoration: none; font-size: 12.5px;
+    padding: 4px 10px; border-radius: 14px; border: 1px solid transparent;
+  }
+  nav a:hover { color: var(--text); border-color: var(--border); background: var(--card); }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 26px;
+    scroll-margin-top: 70px;
+  }
+  h2 { font-size: 19px; margin: 0 0 6px; }
+  h2 .num {
+    display: inline-block; background: var(--accent); color: #08121f;
+    border-radius: 6px; padding: 0 8px; margin-right: 8px; font-size: 15px;
+  }
+  h3 { font-size: 15px; color: var(--accent); margin: 18px 0 6px; }
+  p.lead { color: var(--sub); font-size: 13.5px; margin: 0 0 14px; }
+  .formula {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin: 10px 0;
+    overflow-x: auto;
+    font-size: 15px;
+  }
+  .formula .cap { font-size: 12px; color: var(--sub); margin-top: 4px; }
+  .note {
+    background: rgba(77,163,255,0.08);
+    border: 1px solid rgba(77,163,255,0.35);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; margin: 10px 0;
+  }
+  /* キャンバス類 */
+  .canvas-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; margin: 14px 0; }
+  .canvas-box { text-align: center; }
+  .canvas-box canvas {
+    width: 232px; height: 232px;
+    image-rendering: pixelated;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #000;
+    display: block;
+  }
+  .canvas-box .cap { font-size: 12px; color: var(--sub); margin-top: 5px; max-width: 232px; }
+  .canvas-box .cap b { color: var(--text); }
+  .arrow {
+    align-self: center; color: var(--accent); font-size: 26px;
+    padding: 0 2px; user-select: none;
+  }
+  /* コントロール */
+  button, select {
+    background: var(--card2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 6px 14px; font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #08121f; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.12); }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  .chiprow { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  .chiprow button.sel { background: var(--accent); color: #08121f; border-color: var(--accent); font-weight: 600; }
+  input[type=range] { accent-color: var(--accent); width: 220px; }
+  label.ctl { font-size: 13px; color: var(--sub); display: flex; align-items: center; gap: 8px; }
+  .val { color: var(--accent2); font-weight: 600; min-width: 3.5em; display: inline-block; }
+  .stat {
+    display: inline-block; background: var(--card2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 10px; font-size: 12.5px; margin: 2px 4px 2px 0;
+  }
+  .stat b { color: var(--accent2); }
+  .stepbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+  .stepbar .st {
+    font-size: 12px; padding: 4px 11px; border-radius: 14px;
+    border: 1px solid var(--border); color: var(--sub); transition: all .25s;
+  }
+  .stepbar .st.on { background: var(--accent); color: #08121f; border-color: var(--accent); font-weight: 600; }
+  .stepbar .st.done { border-color: var(--green); color: var(--green); }
+  .dyn-formula { min-height: 36px; }
+  .legend { font-size: 12px; color: var(--sub); }
+  footer { text-align: center; color: var(--sub); font-size: 12px; padding: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌀 画像フーリエ変換 <span>ビジュアル学習</span></h1>
+  <nav>
+    <a href="#sec-theory">① 数式</a>
+    <a href="#sec-input">② 入力画像</a>
+    <a href="#sec-process">③ 変換の過程</a>
+    <a href="#sec-spectrum">④ スペクトル探索</a>
+    <a href="#sec-filter">⑤ フィルタ実験</a>
+    <a href="#sec-recon">⑥ 逐次再構成</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============ ① 理論 ============ -->
+<section id="sec-theory">
+  <h2><span class="num">1</span>2次元離散フーリエ変換(2D DFT)とは</h2>
+  <p class="lead">
+    画像は「明るさの2次元配列」です。フーリエ変換は、その画像を<b>さまざまな向き・細かさの縞模様(2次元正弦波)の重ね合わせ</b>に分解します。
+    どの縞がどれだけ強く含まれるかを表したものが「スペクトル」です。
+  </p>
+
+  <div class="formula">
+    $$F(u,v) = \sum_{x=0}^{N-1}\sum_{y=0}^{N-1} f(x,y)\, e^{-i 2\pi \left(\frac{ux}{N} + \frac{vy}{N}\right)}$$
+    <div class="cap">順変換:画像 \(f(x,y)\)(画素値)→ スペクトル \(F(u,v)\)(複素数)。\(u,v\) は横・縦方向の周波数(画像1枚あたりの縞の本数)。</div>
+  </div>
+
+  <div class="formula">
+    $$f(x,y) = \frac{1}{N^2}\sum_{u=0}^{N-1}\sum_{v=0}^{N-1} F(u,v)\, e^{+i 2\pi \left(\frac{ux}{N} + \frac{vy}{N}\right)}$$
+    <div class="cap">逆変換:スペクトルから元の画像を完全に復元できます(情報は失われません)。</div>
+  </div>
+
+  <div class="grid2">
+    <div class="formula">
+      $$|F(u,v)| = \sqrt{\mathrm{Re}^2 + \mathrm{Im}^2}$$
+      <div class="cap"><b>振幅スペクトル</b>:周波数 \((u,v)\) の縞が「どれだけ強いか」</div>
+    </div>
+    <div class="formula">
+      $$\phi(u,v) = \mathrm{atan2}\!\left(\mathrm{Im},\,\mathrm{Re}\right)$$
+      <div class="cap"><b>位相スペクトル</b>:その縞が「どの位置にずれているか」</div>
+    </div>
+  </div>
+
+  <div class="note">
+    💡 表示の工夫:振幅は桁の差が大きいので \(D(u,v)=\log(1+|F(u,v)|)\) と<b>対数スケール</b>にし、
+    低周波(おおまかな模様)が中央に来るよう象限を入れ替えて表示します(<b>fftshift</b>)。
+    中央 = 直流成分(画像の平均の明るさ)、外側ほど細かい模様です。
+  </div>
+</section>
+
+<!-- ============ ② 入力画像 ============ -->
+<section id="sec-input">
+  <h2><span class="num">2</span>入力画像を選ぶ</h2>
+  <p class="lead">画像を選ぶと即座に 128×128 のグレースケールに変換され、以降のすべての可視化が更新されます。単純な縞模様から始めると、スペクトルとの対応が見えやすいです。</p>
+  <div class="chiprow" id="sampleBtns"></div>
+  <div class="controls">
+    <label class="ctl">📁 自分の画像を使う:
+      <input type="file" id="fileInput" accept="image/*">
+    </label>
+  </div>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvInput" width="128" height="128"></canvas>
+      <div class="cap"><b>入力画像 f(x, y)</b><br>128×128 グレースケール</div>
+    </div>
+    <div class="arrow">⟹</div>
+    <div class="canvas-box">
+      <canvas id="cvInputMag" width="128" height="128"></canvas>
+      <div class="cap"><b>振幅スペクトル log(1+|F|)</b><br>中央=低周波 / 外側=高周波</div>
+    </div>
+    <div class="canvas-box">
+      <canvas id="cvInputPhase" width="128" height="128"></canvas>
+      <div class="cap"><b>位相スペクトル φ(u, v)</b><br>色相 = 位相角(−π 〜 +π)</div>
+    </div>
+  </div>
+  <div id="inputHint" class="note"></div>
+</section>
+
+<!-- ============ ③ 過程 ============ -->
+<section id="sec-process">
+  <h2><span class="num">3</span>変換の「過程」を見る:行 → 列の2段階FFT</h2>
+  <p class="lead">
+    2次元DFTは<b>分離可能</b>です。「各行に1次元FFT」→「各列に1次元FFT」の2段階で計算できます。
+    再生ボタンで、1行ずつ・1列ずつ変換されていく様子をアニメーション表示します。
+  </p>
+  <div class="formula">
+    $$F(u,v) = \sum_{y=0}^{N-1} \underbrace{\left[\sum_{x=0}^{N-1} f(x,y)\, e^{-i2\pi ux/N}\right]}_{\text{① 各行の1次元FFT } G(u,\,y)} e^{-i2\pi vy/N}
+    \;\;\Longleftarrow\;\; \text{② 各列の1次元FFT}$$
+  </div>
+  <div class="stepbar">
+    <span class="st" id="st0">STEP 0 : グレースケール化</span>
+    <span class="st" id="st1">STEP 1 : 各行を1次元FFT</span>
+    <span class="st" id="st2">STEP 2 : 各列を1次元FFT</span>
+    <span class="st" id="st3">STEP 3 : fftshift + 対数表示</span>
+  </div>
+  <div class="controls">
+    <button class="primary" id="btnPlayProcess">▶ 過程を再生</button>
+    <button id="btnResetProcess">⟲ リセット</button>
+    <label class="ctl">速度
+      <input type="range" id="speedRange" min="1" max="16" value="4">
+    </label>
+    <span class="stat" id="procStat">待機中</span>
+  </div>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvProc0" width="128" height="128"></canvas>
+      <div class="cap"><b>f(x, y)</b> 入力<br><span id="capProc0">黄線 = 処理中の行</span></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="canvas-box">
+      <canvas id="cvProc1" width="128" height="128"></canvas>
+      <div class="cap"><b>G(u, y)</b> 行FFT後<br>横方向だけ周波数になった中間結果</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="canvas-box">
+      <canvas id="cvProc2" width="128" height="128"></canvas>
+      <div class="cap"><b>F(u, v)</b> 列FFT後<br>(シフト前:四隅が低周波)</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="canvas-box">
+      <canvas id="cvProc3" width="128" height="128"></canvas>
+      <div class="cap"><b>fftshift + log</b><br>低周波を中央に移動した最終表示</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ④ スペクトル探索 ============ -->
+<section id="sec-spectrum">
+  <h2><span class="num">4</span>スペクトルをクリックして「中身の波」を見る</h2>
+  <p class="lead">
+    左のスペクトル上の点をクリックすると、その1点 \(F(u,v)\) が表す<b>2次元正弦波(基底)</b>を右に表示します。
+    スペクトルの1点1点が、こうした縞模様1枚に対応しています。
+  </p>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvSpecPick" width="128" height="128" style="cursor: crosshair;"></canvas>
+      <div class="cap"><b>振幅スペクトル(クリック可)</b><br>＋印 = 選択中の周波数</div>
+    </div>
+    <div class="arrow">⟹</div>
+    <div class="canvas-box">
+      <canvas id="cvBasis" width="128" height="128"></canvas>
+      <div class="cap"><b>対応する基底波</b><br><span id="capBasis">cos 波(振幅・位相を反映)</span></div>
+    </div>
+    <div class="canvas-box">
+      <canvas id="cvBasisSum" width="128" height="128"></canvas>
+      <div class="cap"><b>この成分+共役対だけで逆変換</b><br>実画像ではペアで1枚の実数の縞になる</div>
+    </div>
+  </div>
+  <div class="formula dyn-formula" id="pickFormula">スペクトルをクリックしてください。</div>
+  <div id="pickStats"></div>
+  <h3>おまけ実験:振幅と位相、どちらが大事?</h3>
+  <div class="controls">
+    <button id="btnMagOnly">振幅のみで再構成(位相=0)</button>
+    <button id="btnPhaseOnly">位相のみで再構成(振幅=1)</button>
+    <button id="btnFullRecon">両方使って再構成(=元画像)</button>
+  </div>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvMagPhase" width="128" height="128"></canvas>
+      <div class="cap" id="capMagPhase"><b>再構成結果</b></div>
+    </div>
+  </div>
+  <div class="note">💡 多くの自然画像では<b>位相</b>の方が形の情報を多く持っています。位相のみでも輪郭がうっすら見えるのに、振幅のみではほぼ何も見えないことを確かめてみてください。</div>
+</section>
+
+<!-- ============ ⑤ フィルタ ============ -->
+<section id="sec-filter">
+  <h2><span class="num">5</span>周波数フィルタリング実験</h2>
+  <p class="lead">
+    スペクトルにマスク \(H(u,v)\) を掛けてから逆変換すると、画像のぼかし(ローパス)やエッジ抽出(ハイパス)ができます。
+    スライダーを動かすとリアルタイムで結果が変わります。
+  </p>
+  <div class="formula">
+    $$g(x,y) = \mathcal{F}^{-1}\Big[\, H(u,v) \cdot F(u,v) \,\Big]$$
+    <div class="cap" id="filterFormulaCap"></div>
+  </div>
+  <div class="chiprow" id="filterBtns"></div>
+  <div class="controls">
+    <label class="ctl">カットオフ半径 D₀
+      <input type="range" id="cutoffRange" min="1" max="64" value="16">
+      <span class="val" id="cutoffVal">16</span>
+    </label>
+    <label class="ctl" id="bandWidthWrap" style="display:none;">帯域幅 W
+      <input type="range" id="bandRange" min="2" max="40" value="10">
+      <span class="val" id="bandVal">10</span>
+    </label>
+  </div>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvFiltSpec" width="128" height="128"></canvas>
+      <div class="cap"><b>① 元のスペクトル |F|</b></div>
+    </div>
+    <div class="arrow">×</div>
+    <div class="canvas-box">
+      <canvas id="cvFiltMask" width="128" height="128"></canvas>
+      <div class="cap"><b>② マスク H(u, v)</b><br>白=通す / 黒=遮断</div>
+    </div>
+    <div class="arrow">=</div>
+    <div class="canvas-box">
+      <canvas id="cvFiltApplied" width="128" height="128"></canvas>
+      <div class="cap"><b>③ H × F(残った成分)</b></div>
+    </div>
+    <div class="arrow">⟹<br><small style="font-size:11px;">逆FFT</small></div>
+    <div class="canvas-box">
+      <canvas id="cvFiltResult" width="128" height="128"></canvas>
+      <div class="cap"><b>④ 結果画像 g(x, y)</b></div>
+    </div>
+  </div>
+  <div id="filterHint" class="note"></div>
+</section>
+
+<!-- ============ ⑥ 逐次再構成 ============ -->
+<section id="sec-recon">
+  <h2><span class="num">6</span>逐次再構成:波を1枚ずつ足して画像を作る</h2>
+  <p class="lead">
+    スペクトルの成分を<b>振幅の大きい順</b>に少しずつ採用して逆変換します。
+    わずかな成分数でも画像の大半が再現できること(=画像のエネルギーが低周波に集中していること)が分かります。JPEG圧縮の原理にもつながる考え方です。
+  </p>
+  <div class="formula">
+    $$f_K(x,y) = \frac{1}{N^2}\sum_{(u,v)\,\in\,\text{上位}K\text{成分}} F(u,v)\, e^{+i2\pi(ux+vy)/N}$$
+  </div>
+  <div class="controls">
+    <button class="primary" id="btnPlayRecon">▶ アニメーション再生</button>
+    <button id="btnStopRecon">⏸ 停止</button>
+    <label class="ctl">採用成分数 K
+      <input type="range" id="reconRange" min="0" max="100" value="30">
+    </label>
+  </div>
+  <div>
+    <span class="stat">採用成分数 K = <b id="reconK">–</b> / 16384</span>
+    <span class="stat">復元エネルギー <b id="reconEnergy">–</b> %</span>
+  </div>
+  <div class="canvas-row">
+    <div class="canvas-box">
+      <canvas id="cvReconMask" width="128" height="128"></canvas>
+      <div class="cap"><b>採用した成分(白)</b><br>振幅の大きい順に追加</div>
+    </div>
+    <div class="arrow">⟹<br><small style="font-size:11px;">逆FFT</small></div>
+    <div class="canvas-box">
+      <canvas id="cvReconResult" width="128" height="128"></canvas>
+      <div class="cap"><b>再構成画像 f_K(x, y)</b></div>
+    </div>
+    <div class="canvas-box">
+      <canvas id="cvReconOrig" width="128" height="128"></canvas>
+      <div class="cap"><b>元画像(比較用)</b></div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>2D DFT visual learning app — すべてブラウザ内の JavaScript で計算しています(N = 128, 基数2 FFT)</footer>
+
+<script>
+"use strict";
+// ===================== 基本設定 =====================
+const N = 128;            // 画像・FFT サイズ(2の冪)
+const N2 = N * N;
+const HALF = N / 2;
+
+// 現在の状態
+let img = new Float64Array(N2);     // 入力画像 0..1
+let Fre = new Float64Array(N2);     // スペクトル実部(シフトなし)
+let Fim = new Float64Array(N2);     // スペクトル虚部
+let sortedIdx = null;               // 振幅降順の成分インデックス
+let cumEnergy = null;               // 累積エネルギー
+let totalEnergy = 1;
+
+// ===================== FFT 実装(基数2・反復型) =====================
+function fft1d(re, im, inverse) {
+  const n = re.length;
+  // ビット反転並べ替え
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  // バタフライ演算
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (inverse ? 2 : -2) * Math.PI / len;
+    const wRe = Math.cos(ang), wIm = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cwRe = 1, cwIm = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const aRe = re[i + k], aIm = im[i + k];
+        const bRe = re[i + k + len / 2] * cwRe - im[i + k + len / 2] * cwIm;
+        const bIm = re[i + k + len / 2] * cwIm + im[i + k + len / 2] * cwRe;
+        re[i + k] = aRe + bRe;  im[i + k] = aIm + bIm;
+        re[i + k + len / 2] = aRe - bRe;  im[i + k + len / 2] = aIm - bIm;
+        const nRe = cwRe * wRe - cwIm * wIm;
+        cwIm = cwRe * wIm + cwIm * wRe;  cwRe = nRe;
+      }
+    }
+  }
+  if (inverse) {
+    for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+}
+
+// 2次元FFT:行→列(in-place)
+function fft2d(re, im, inverse) {
+  const rowRe = new Float64Array(N), rowIm = new Float64Array(N);
+  for (let y = 0; y < N; y++) {           // 各行
+    const off = y * N;
+    for (let x = 0; x < N; x++) { rowRe[x] = re[off + x]; rowIm[x] = im[off + x]; }
+    fft1d(rowRe, rowIm, inverse);
+    for (let x = 0; x < N; x++) { re[off + x] = rowRe[x]; im[off + x] = rowIm[x]; }
+  }
+  for (let x = 0; x < N; x++) {           // 各列
+    for (let y = 0; y < N; y++) { rowRe[y] = re[y * N + x]; rowIm[y] = im[y * N + x]; }
+    fft1d(rowRe, rowIm, inverse);
+    for (let y = 0; y < N; y++) { re[y * N + x] = rowRe[y]; im[y * N + x] = rowIm[y]; }
+  }
+}
+
+// シフト後の表示座標 (i,j) → 配列インデックス
+function shiftIdx(i, j) {
+  return ((j + HALF) % N) * N + ((i + HALF) % N);
+}
+
+// ===================== 描画ユーティリティ =====================
+function ctxOf(id) { return document.getElementById(id).getContext("2d"); }
+
+function drawGray(ctx, data, lo, hi) {
+  if (lo === undefined) {
+    lo = Infinity; hi = -Infinity;
+    for (let i = 0; i < N2; i++) { if (data[i] < lo) lo = data[i]; if (data[i] > hi) hi = data[i]; }
+    if (hi - lo < 1e-12) hi = lo + 1;
+  }
+  const im = ctx.createImageData(N, N);
+  for (let i = 0; i < N2; i++) {
+    const v = Math.max(0, Math.min(255, Math.round((data[i] - lo) / (hi - lo) * 255)));
+    im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v;
+    im.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+}
+
+// 対数振幅スペクトル(シフトあり/なし選択可)— "inferno風" カラーマップ
+function magColor(t) { // t: 0..1 → [r,g,b]
+  const r = Math.min(255, Math.round(255 * Math.pow(t, 0.55) * 1.3));
+  const g = Math.round(255 * Math.pow(t, 1.4));
+  const b = Math.round(255 * (t < 0.4 ? t * 1.4 : Math.max(0, 1.2 - t * 1.4)) * 0.9 + 20 * t);
+  return [r, g, b];
+}
+
+function drawLogMag(ctx, re, imArr, shifted) {
+  const buf = new Float64Array(N2);
+  let mx = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const k = shifted ? shiftIdx(i, j) : j * N + i;
+    const v = Math.log(1 + Math.hypot(re[k], imArr[k]));
+    buf[j * N + i] = v;
+    if (v > mx) mx = v;
+  }
+  if (mx < 1e-12) mx = 1;
+  const id = ctx.createImageData(N, N);
+  for (let i = 0; i < N2; i++) {
+    const [r, g, b] = magColor(buf[i] / mx);
+    id.data[i * 4] = r; id.data[i * 4 + 1] = g; id.data[i * 4 + 2] = b; id.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+function drawPhase(ctx, re, imArr) {
+  const id = ctx.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const k = shiftIdx(i, j);
+    const ph = Math.atan2(imArr[k], re[k]);          // -π..π
+    const hue = (ph + Math.PI) / (2 * Math.PI) * 360;
+    const mag = Math.hypot(re[k], imArr[k]);
+    const light = 0.18 + 0.42 * Math.min(1, Math.log(1 + mag) / 8); // 弱い成分は暗く
+    const [r, g, b] = hslToRgb(hue, 0.85, light);
+    const p = (j * N + i) * 4;
+    id.data[p] = r; id.data[p + 1] = g; id.data[p + 2] = b; id.data[p + 3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, hp = h / 60, x = c * (1 - Math.abs(hp % 2 - 1));
+  let r = 0, g = 0, b = 0;
+  if (hp < 1) [r, g, b] = [c, x, 0]; else if (hp < 2) [r, g, b] = [x, c, 0];
+  else if (hp < 3) [r, g, b] = [0, c, x]; else if (hp < 4) [r, g, b] = [0, x, c];
+  else if (hp < 5) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
+  const m = l - c / 2;
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+// ===================== サンプル画像 =====================
+const samples = [
+  { name: "縦縞 (f=8)", hint: "縦縞は「横方向の周波数」だけを持つため、スペクトルは中央から<b>左右に並んだ輝点</b>になります。縞が細かいほど輝点は中央から離れます。",
+    gen: (x, y) => 0.5 + 0.5 * Math.sin(2 * Math.PI * 8 * x / N) },
+  { name: "斜め縞", hint: "縞を斜めにすると、スペクトルの輝点も<b>同じだけ回転</b>します。画像の回転はスペクトルの回転に対応します(回転定理)。",
+    gen: (x, y) => 0.5 + 0.5 * Math.sin(2 * Math.PI * (6 * x + 10 * y) / N) },
+  { name: "2つの波の合成", hint: "周波数の異なる2つの正弦波の和。スペクトルには<b>2組の輝点ペア</b>が現れ、「重ね合わせ → スペクトルも足し算」という線形性が確認できます。",
+    gen: (x, y) => 0.5 + 0.25 * Math.sin(2 * Math.PI * 4 * x / N) + 0.25 * Math.sin(2 * Math.PI * (12 * y - 5 * x) / N) },
+  { name: "市松模様", hint: "矩形波的な模様は1つの正弦波では作れないため、基本周波数の<b>奇数倍の高調波</b>が格子状に並びます。",
+    gen: (x, y) => ((Math.floor(x / 8) + Math.floor(y / 8)) % 2) ? 1 : 0 },
+  { name: "白い円盤", hint: "円盤のスペクトルは同心円状の<b>リング(エアリーパターン風)</b>になります。シャープな縁があるため高周波まで成分が伸びます。",
+    gen: (x, y) => (Math.hypot(x - HALF, y - HALF) < 24) ? 1 : 0 },
+  { name: "ガウシアン", hint: "ガウシアンのフーリエ変換は<b>やはりガウシアン</b>。滑らかな画像ほどスペクトルは中央(低周波)に集中します。境界が滑らかなのでリングは出ません。",
+    gen: (x, y) => Math.exp(-((x - HALF) ** 2 + (y - HALF) ** 2) / (2 * 14 * 14)) },
+  { name: "矩形", hint: "矩形のスペクトルは縦横に伸びる <b>sinc 関数の十字</b>。エッジに垂直な方向へ高周波成分が伸びるのがポイントです。",
+    gen: (x, y) => (Math.abs(x - HALF) < 18 && Math.abs(y - HALF) < 30) ? 1 : 0 },
+  { name: "スマイリー", hint: "輪郭・目・口など様々な向きのエッジを持つ「絵」。スペクトルは中央に強く集中しつつ、各エッジに垂直な方向へ成分が伸びます。フィルタ実験(⑤)に最適。",
+    gen: null }, // canvas で描く
+  { name: "ランダムノイズ", hint: "ホワイトノイズは<b>全周波数をほぼ均等に</b>含みます。スペクトルが一様にざらつくことを確認してください。ローパスフィルタによる平滑化も試せます。",
+    gen: (x, y) => Math.random() },
+];
+
+function genSmiley() {
+  const c = document.createElement("canvas");
+  c.width = N; c.height = N;
+  const g = c.getContext("2d");
+  g.fillStyle = "#202020"; g.fillRect(0, 0, N, N);
+  g.strokeStyle = "#fff"; g.fillStyle = "#e8e8e8"; g.lineWidth = 4;
+  g.beginPath(); g.arc(64, 64, 44, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.fillStyle = "#202020";
+  g.beginPath(); g.arc(48, 52, 7, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(80, 52, 7, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = "#202020"; g.lineWidth = 5;
+  g.beginPath(); g.arc(64, 66, 24, 0.25 * Math.PI, 0.75 * Math.PI); g.stroke();
+  g.fillStyle = "#fff";
+  g.fillRect(8, 104, 50, 6);   // アクセントの線(エッジ成分)
+  const d = g.getImageData(0, 0, N, N).data;
+  const out = new Float64Array(N2);
+  for (let i = 0; i < N2; i++) out[i] = d[i * 4] / 255;
+  return out;
+}
+
+// ===================== 状態更新の中枢 =====================
+function setImage(data, hint) {
+  img = data;
+  // スペクトル計算
+  Fre = Float64Array.from(img);
+  Fim = new Float64Array(N2);
+  fft2d(Fre, Fim, false);
+  // 振幅降順ソートと累積エネルギー
+  const mag2 = new Float64Array(N2);
+  totalEnergy = 0;
+  for (let i = 0; i < N2; i++) { mag2[i] = Fre[i] * Fre[i] + Fim[i] * Fim[i]; totalEnergy += mag2[i]; }
+  sortedIdx = Array.from({ length: N2 }, (_, i) => i).sort((a, b) => mag2[b] - mag2[a]);
+  cumEnergy = new Float64Array(N2);
+  let acc = 0;
+  for (let r = 0; r < N2; r++) { acc += mag2[sortedIdx[r]]; cumEnergy[r] = acc; }
+  if (totalEnergy < 1e-12) totalEnergy = 1;
+
+  document.getElementById("inputHint").innerHTML = "🔍 " + (hint || "");
+
+  // 各ビュー更新
+  drawGray(ctxOf("cvInput"), img, 0, 1);
+  drawLogMag(ctxOf("cvInputMag"), Fre, Fim, true);
+  drawPhase(ctxOf("cvInputPhase"), Fre, Fim);
+  resetProcess();
+  drawSpecPick();
+  clearPick();
+  drawGray(ctxOf("cvMagPhase"), img, 0, 1);
+  document.getElementById("capMagPhase").innerHTML = "<b>再構成結果</b>(ボタンで実験)";
+  updateFilter();
+  drawGray(ctxOf("cvReconOrig"), img, 0, 1);
+  updateRecon();
+}
+
+// ===================== ② サンプルボタン =====================
+const sampleBtnsDiv = document.getElementById("sampleBtns");
+samples.forEach((s, idx) => {
+  const b = document.createElement("button");
+  b.textContent = s.name;
+  b.onclick = () => {
+    [...sampleBtnsDiv.children].forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    let data;
+    if (s.gen === null) data = genSmiley();
+    else {
+      data = new Float64Array(N2);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) data[y * N + x] = s.gen(x, y);
+    }
+    setImage(data, s.hint);
+  };
+  sampleBtnsDiv.appendChild(b);
+});
+
+document.getElementById("fileInput").addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  const image = new Image();
+  image.onload = () => {
+    const c = document.createElement("canvas");
+    c.width = N; c.height = N;
+    const g = c.getContext("2d");
+    // 中央クロップして 128×128 に
+    const s = Math.min(image.width, image.height);
+    g.drawImage(image, (image.width - s) / 2, (image.height - s) / 2, s, s, 0, 0, N, N);
+    const d = g.getImageData(0, 0, N, N).data;
+    const out = new Float64Array(N2);
+    for (let i = 0; i < N2; i++)
+      out[i] = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255;
+    [...sampleBtnsDiv.children].forEach(x => x.classList.remove("sel"));
+    setImage(out, "アップロード画像。自然画像はエネルギーが低周波(中央)に強く集中します。⑥の逐次再構成で「少ない成分でどこまで再現できるか」を試してみてください。");
+    URL.revokeObjectURL(url);
+  };
+  image.src = url;
+});
+
+// ===================== ③ 過程アニメーション =====================
+let procAnim = null;
+let procRowRe, procRowIm; // 行FFT後の中間結果
+
+function setStep(n) {
+  for (let i = 0; i <= 3; i++) {
+    const el = document.getElementById("st" + i);
+    el.classList.toggle("on", i === n);
+    el.classList.toggle("done", i < n);
+  }
+}
+
+function resetProcess() {
+  if (procAnim) { cancelAnimationFrame(procAnim); procAnim = null; }
+  setStep(0);
+  document.getElementById("procStat").textContent = "待機中";
+  drawGray(ctxOf("cvProc0"), img, 0, 1);
+  const blank = ctx => { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, N, N); };
+  blank(ctxOf("cvProc1")); blank(ctxOf("cvProc2")); blank(ctxOf("cvProc3"));
+}
+
+document.getElementById("btnResetProcess").onclick = resetProcess;
+
+document.getElementById("btnPlayProcess").onclick = () => {
+  if (procAnim) cancelAnimationFrame(procAnim);
+  // 中間データ準備
+  procRowRe = Float64Array.from(img);
+  procRowIm = new Float64Array(N2);
+  const rowRe = new Float64Array(N), rowIm = new Float64Array(N);
+  // 全行FFT(描画は進行に合わせて)
+  for (let y = 0; y < N; y++) {
+    const off = y * N;
+    for (let x = 0; x < N; x++) { rowRe[x] = procRowRe[off + x]; rowIm[x] = 0; }
+    fft1d(rowRe, rowIm, false);
+    for (let x = 0; x < N; x++) { procRowRe[off + x] = rowRe[x]; procRowIm[off + x] = rowIm[x]; }
+  }
+  // 行FFT後の log|G| 画像(行ごとシフトして低周波を中央寄せ表示)
+  const gMag = new Float64Array(N2);
+  let gMax = 0;
+  for (let y = 0; y < N; y++) for (let i = 0; i < N; i++) {
+    const k = y * N + (i + HALF) % N;
+    const v = Math.log(1 + Math.hypot(procRowRe[k], procRowIm[k]));
+    gMag[y * N + i] = v; if (v > gMax) gMax = v;
+  }
+  // 最終 |F|(シフトなし)
+  const fRe = Float64Array.from(procRowRe), fIm = Float64Array.from(procRowIm);
+  const colRe = new Float64Array(N), colIm = new Float64Array(N);
+  for (let x = 0; x < N; x++) {
+    for (let y = 0; y < N; y++) { colRe[y] = fRe[y * N + x]; colIm[y] = fIm[y * N + x]; }
+    fft1d(colRe, colIm, false);
+    for (let y = 0; y < N; y++) { fRe[y * N + x] = colRe[y]; fIm[y * N + x] = colIm[y]; }
+  }
+  const fMag = new Float64Array(N2);
+  let fMax = 0;
+  for (let i = 0; i < N2; i++) { const v = Math.log(1 + Math.hypot(fRe[i], fIm[i])); fMag[i] = v; if (v > fMax) fMax = v; }
+
+  resetProcess();
+  const ctx0 = ctxOf("cvProc0"), ctx1 = ctxOf("cvProc1"), ctx2 = ctxOf("cvProc2"), ctx3 = ctxOf("cvProc3");
+  const stat = document.getElementById("procStat");
+  let phase = 1, pos = 0;
+  setStep(1);
+
+  function frame() {
+    const speed = +document.getElementById("speedRange").value;
+    if (phase === 1) {
+      // 行を speed 本ずつ描画
+      const id = ctx1.getImageData(0, 0, N, N);
+      for (let s = 0; s < speed && pos < N; s++, pos++) {
+        for (let i = 0; i < N; i++) {
+          const [r, g, b] = magColor(gMag[pos * N + i] / (gMax || 1));
+          const p = (pos * N + i) * 4;
+          id.data[p] = r; id.data[p + 1] = g; id.data[p + 2] = b; id.data[p + 3] = 255;
+        }
+      }
+      ctx1.putImageData(id, 0, 0);
+      // 入力側に処理中の行を黄線で表示
+      drawGray(ctx0, img, 0, 1);
+      if (pos < N) { ctx0.fillStyle = "rgba(255,220,60,0.9)"; ctx0.fillRect(0, pos, N, 1); }
+      stat.textContent = `STEP 1: 行 ${Math.min(pos, N)} / ${N} を1次元FFT中`;
+      if (pos >= N) { phase = 2; pos = 0; setStep(2); }
+    } else if (phase === 2) {
+      const id = ctx2.getImageData(0, 0, N, N);
+      for (let s = 0; s < speed && pos < N; s++, pos++) {
+        for (let j = 0; j < N; j++) {
+          const [r, g, b] = magColor(fMag[j * N + pos] / (fMax || 1));
+          const p = (j * N + pos) * 4;
+          id.data[p] = r; id.data[p + 1] = g; id.data[p + 2] = b; id.data[p + 3] = 255;
+        }
+      }
+      ctx2.putImageData(id, 0, 0);
+      // 中間結果側に処理中の列を黄線で表示
+      ctx1.putImageData(ctx1.getImageData(0, 0, N, N), 0, 0);
+      drawProc1WithLine(ctx1, gMag, gMax, pos < N ? pos : -1);
+      stat.textContent = `STEP 2: 列 ${Math.min(pos, N)} / ${N} を1次元FFT中`;
+      if (pos >= N) { phase = 3; setStep(3); }
+    } else {
+      drawLogMag(ctx3, fRe, fIm, true);
+      stat.textContent = "完了!低周波(明るい部分)が中央に集まりました";
+      setStep(3);
+      document.getElementById("st3").classList.add("done");
+      procAnim = null;
+      return;
+    }
+    procAnim = requestAnimationFrame(frame);
+  }
+  procAnim = requestAnimationFrame(frame);
+};
+
+function drawProc1WithLine(ctx, gMag, gMax, lineX) {
+  const id = ctx.createImageData(N, N);
+  for (let i = 0; i < N2; i++) {
+    const [r, g, b] = magColor(gMag[i] / (gMax || 1));
+    id.data[i * 4] = r; id.data[i * 4 + 1] = g; id.data[i * 4 + 2] = b; id.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+  if (lineX >= 0) { ctx.fillStyle = "rgba(255,220,60,0.9)"; ctx.fillRect(lineX, 0, 1, N); }
+}
+
+// ===================== ④ スペクトル探索 =====================
+let pickPos = null; // 表示座標 {i, j}
+
+function drawSpecPick() {
+  const ctx = ctxOf("cvSpecPick");
+  drawLogMag(ctx, Fre, Fim, true);
+  if (pickPos) {
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pickPos.i - 5, pickPos.j + 0.5); ctx.lineTo(pickPos.i + 6, pickPos.j + 0.5);
+    ctx.moveTo(pickPos.i + 0.5, pickPos.j - 5); ctx.lineTo(pickPos.i + 0.5, pickPos.j + 6);
+    ctx.stroke();
+  }
+}
+
+function clearPick() {
+  pickPos = null;
+  const b = ctxOf("cvBasis"), s = ctxOf("cvBasisSum");
+  b.fillStyle = "#000"; b.fillRect(0, 0, N, N);
+  s.fillStyle = "#000"; s.fillRect(0, 0, N, N);
+  document.getElementById("pickFormula").textContent = "スペクトルをクリックしてください。";
+  document.getElementById("pickStats").innerHTML = "";
+}
+
+document.getElementById("cvSpecPick").addEventListener("click", e => {
+  const rect = e.target.getBoundingClientRect();
+  const i = Math.floor((e.clientX - rect.left) / rect.width * N);
+  const j = Math.floor((e.clientY - rect.top) / rect.height * N);
+  pickPos = { i, j };
+  drawSpecPick();
+
+  const u = i - HALF, v = j - HALF;            // 符号付き周波数
+  const k = shiftIdx(i, j);
+  const re = Fre[k], imv = Fim[k];
+  const mag = Math.hypot(re, imv);
+  const ph = Math.atan2(imv, re);
+
+  // 基底波の描画: cos(2π(ux+vy)/N + φ)
+  const basis = new Float64Array(N2);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
+    basis[y * N + x] = Math.cos(2 * Math.PI * (u * x + v * y) / N + ph);
+  drawGray(ctxOf("cvBasis"), basis, -1, 1);
+
+  // この成分(+共役対)だけで逆変換
+  const sRe = new Float64Array(N2), sIm = new Float64Array(N2);
+  const ku = ((u % N) + N) % N, kv = ((v % N) + N) % N;
+  const kc = ((N - kv) % N) * N + ((N - ku) % N);  // 共役対
+  sRe[kv * N + ku] = re;  sIm[kv * N + ku] = imv;
+  sRe[kc] = Fre[kc];      sIm[kc] = Fim[kc];
+  fft2d(sRe, sIm, true);
+  drawGray(ctxOf("cvBasisSum"), sRe);
+
+  // 動的数式
+  const el = document.getElementById("pickFormula");
+  const tex = `F(${u},\\,${v}) = ${re.toFixed(1)} ${imv >= 0 ? "+" : "-"} ${Math.abs(imv).toFixed(1)}\\,i
+    \\;\\;\\Rightarrow\\;\\; |F| = ${mag.toFixed(1)},\\;\\; \\phi = ${ph.toFixed(2)}\\,\\text{rad}`;
+  if (window.katex) katex.render(tex, el, { throwOnError: false });
+  else el.textContent = tex;
+
+  const cycles = Math.hypot(u, v).toFixed(1);
+  const angle = (Math.atan2(v, u) * 180 / Math.PI).toFixed(0);
+  document.getElementById("pickStats").innerHTML =
+    `<span class="stat">周波数 (u, v) = (<b>${u}</b>, <b>${v}</b>)</span>` +
+    `<span class="stat">画像1枚あたり <b>${cycles}</b> 周期の縞</span>` +
+    `<span class="stat">縞の向き <b>${angle}°</b></span>` +
+    `<span class="stat">全エネルギーに占める割合 <b>${(100 * (re * re + imv * imv) / totalEnergy).toFixed(2)}</b> %</span>`;
+  document.getElementById("capBasis").textContent =
+    u === 0 && v === 0 ? "直流成分(画像の平均値=一様な明るさ)" : `cos(2π(${u}x ${v >= 0 ? "+" : "−"} ${Math.abs(v)}y)/128 + φ)`;
+});
+
+// 振幅のみ / 位相のみ再構成
+function reconMagPhase(mode) {
+  const re = new Float64Array(N2), imv = new Float64Array(N2);
+  for (let i = 0; i < N2; i++) {
+    const m = Math.hypot(Fre[i], Fim[i]);
+    const p = Math.atan2(Fim[i], Fre[i]);
+    if (mode === "mag") { re[i] = m; imv[i] = 0; }                     // 位相を捨てる
+    else if (mode === "phase") { re[i] = Math.cos(p); imv[i] = Math.sin(p); } // 振幅を1に
+    else { re[i] = Fre[i]; imv[i] = Fim[i]; }
+  }
+  fft2d(re, imv, true);
+  // 見やすいよう percentile でクリップ
+  const vals = Float64Array.from(re).sort();
+  const lo = vals[Math.floor(N2 * 0.02)], hi = vals[Math.floor(N2 * 0.98)];
+  drawGray(ctxOf("cvMagPhase"), re, lo, hi === lo ? lo + 1 : hi);
+  const cap = { mag: "<b>振幅のみ</b>(位相=0):構造がほぼ消える", phase: "<b>位相のみ</b>(振幅=1):輪郭が残る!", full: "<b>振幅+位相</b>:完全に復元" };
+  document.getElementById("capMagPhase").innerHTML = cap[mode];
+}
+document.getElementById("btnMagOnly").onclick = () => reconMagPhase("mag");
+document.getElementById("btnPhaseOnly").onclick = () => reconMagPhase("phase");
+document.getElementById("btnFullRecon").onclick = () => reconMagPhase("full");
+
+// ===================== ⑤ フィルタ =====================
+const filters = [
+  { key: "ilp", name: "理想ローパス", needBand: false,
+    tex: "H(u,v)=\\begin{cases}1 & D(u,v)\\le D_0\\\\ 0 & \\text{otherwise}\\end{cases}",
+    hint: "低周波だけを通すと画像は<b>ぼやけ</b>ます。理想フィルタは境界が急峻なため、結果に<b>リンギング(波紋状の偽輪郭)</b>が出ることにも注目。",
+    h: (d, d0, w) => d <= d0 ? 1 : 0 },
+  { key: "glp", name: "ガウシアンローパス", needBand: false,
+    tex: "H(u,v)=e^{-D^2(u,v)/2D_0^2}",
+    hint: "ガウシアンで滑らかに減衰させると、リンギングのない<b>自然なぼかし</b>になります。理想ローパスと見比べてください。",
+    h: (d, d0, w) => Math.exp(-(d * d) / (2 * d0 * d0)) },
+  { key: "ihp", name: "理想ハイパス", needBand: false,
+    tex: "H(u,v)=\\begin{cases}0 & D(u,v)\\le D_0\\\\ 1 & \\text{otherwise}\\end{cases}",
+    hint: "高周波だけを残すと、変化の激しい場所=<b>エッジ(輪郭)だけが抽出</b>されます。平坦な部分は消えます。",
+    h: (d, d0, w) => d <= d0 ? 0 : 1 },
+  { key: "ghp", name: "ガウシアンハイパス", needBand: false,
+    tex: "H(u,v)=1-e^{-D^2(u,v)/2D_0^2}",
+    hint: "滑らかなハイパス。エッジ強調・シャープネス処理の基礎になります。",
+    h: (d, d0, w) => 1 - Math.exp(-(d * d) / (2 * d0 * d0)) },
+  { key: "bp", name: "バンドパス", needBand: true,
+    tex: "H(u,v)=\\begin{cases}1 & |D(u,v)-D_0|\\le W/2\\\\ 0 & \\text{otherwise}\\end{cases}",
+    hint: "特定の細かさの模様だけを取り出します。市松模様などで「特定の高調波だけ残す」実験をすると面白いです。",
+    h: (d, d0, w) => Math.abs(d - d0) <= w / 2 ? 1 : 0 },
+];
+let curFilter = filters[0];
+
+const filterBtnsDiv = document.getElementById("filterBtns");
+filters.forEach((f, idx) => {
+  const b = document.createElement("button");
+  b.textContent = f.name;
+  if (idx === 0) b.classList.add("sel");
+  b.onclick = () => {
+    [...filterBtnsDiv.children].forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    curFilter = f;
+    document.getElementById("bandWidthWrap").style.display = f.needBand ? "" : "none";
+    updateFilter();
+  };
+  filterBtnsDiv.appendChild(b);
+});
+document.getElementById("cutoffRange").addEventListener("input", updateFilter);
+document.getElementById("bandRange").addEventListener("input", updateFilter);
+
+function updateFilter() {
+  const d0 = +document.getElementById("cutoffRange").value;
+  const w = +document.getElementById("bandRange").value;
+  document.getElementById("cutoffVal").textContent = d0;
+  document.getElementById("bandVal").textContent = w;
+
+  // マスク生成(シフト後座標で中心からの距離)
+  const mask = new Float64Array(N2); // 表示座標系
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const d = Math.hypot(i - HALF, j - HALF);
+    mask[j * N + i] = curFilter.h(d, d0, w);
+  }
+  // 適用(配列座標系に変換しながら)
+  const gRe = new Float64Array(N2), gIm = new Float64Array(N2);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const k = shiftIdx(i, j);
+    const h = mask[j * N + i];
+    gRe[k] = Fre[k] * h; gIm[k] = Fim[k] * h;
+  }
+  drawLogMag(ctxOf("cvFiltSpec"), Fre, Fim, true);
+  drawGray(ctxOf("cvFiltMask"), mask, 0, 1);
+  drawLogMag(ctxOf("cvFiltApplied"), gRe, gIm, true);
+  fft2d(gRe, gIm, true);
+  drawGray(ctxOf("cvFiltResult"), gRe);
+
+  // 数式とヒント
+  const cap = document.getElementById("filterFormulaCap");
+  const texEl = document.createElement("span");
+  cap.innerHTML = "";
+  cap.appendChild(texEl);
+  const tex = curFilter.tex + `\\quad\\big(D(u,v)=\\sqrt{u^2+v^2},\\; D_0=${d0}` + (curFilter.needBand ? `,\\;W=${w}` : "") + `\\big)`;
+  if (window.katex) katex.render(tex, texEl, { throwOnError: false });
+  else texEl.textContent = tex;
+  document.getElementById("filterHint").innerHTML = "🔍 " + curFilter.hint;
+}
+
+// ===================== ⑥ 逐次再構成 =====================
+let reconAnim = null;
+
+function sliderToK(t) {  // 0..100 → 0..N² (指数スケール)
+  if (t <= 0) return 0;
+  return Math.min(N2, Math.round(Math.pow(N2, t / 100)));
+}
+
+function updateRecon() {
+  const t = +document.getElementById("reconRange").value;
+  const K = sliderToK(t);
+  document.getElementById("reconK").textContent = K;
+  document.getElementById("reconEnergy").textContent =
+    K === 0 ? "0.0" : (100 * cumEnergy[K - 1] / totalEnergy).toFixed(1);
+
+  const re = new Float64Array(N2), imv = new Float64Array(N2);
+  const maskImg = new Float64Array(N2);
+  for (let r = 0; r < K; r++) {
+    const k = sortedIdx[r];
+    re[k] = Fre[k]; imv[k] = Fim[k];
+    // マスク表示用(表示座標へ)
+    const au = k % N, av = (k - au) / N;
+    const di = (au + HALF) % N, dj = (av + HALF) % N;
+    maskImg[dj * N + di] = 1;
+  }
+  drawGray(ctxOf("cvReconMask"), maskImg, 0, 1);
+  fft2d(re, imv, true);
+  drawGray(ctxOf("cvReconResult"), re, 0, 1);
+}
+
+document.getElementById("reconRange").addEventListener("input", () => {
+  stopRecon();
+  updateRecon();
+});
+
+function stopRecon() {
+  if (reconAnim) { cancelAnimationFrame(reconAnim); reconAnim = null; }
+}
+document.getElementById("btnStopRecon").onclick = stopRecon;
+
+document.getElementById("btnPlayRecon").onclick = () => {
+  stopRecon();
+  const slider = document.getElementById("reconRange");
+  slider.value = 0;
+  let t = 0;
+  function frame() {
+    t += 0.45;
+    if (t > 100) { t = 100; }
+    slider.value = t;
+    updateRecon();
+    if (t < 100) reconAnim = requestAnimationFrame(frame);
+    else reconAnim = null;
+  }
+  reconAnim = requestAnimationFrame(frame);
+};
+
+// ===================== 初期化 =====================
+window.addEventListener("DOMContentLoaded", () => {
+  // KaTeX 自動レンダリング
+  const tryRender = () => {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    } else setTimeout(tryRender, 200);
+  };
+  tryRender();
+  // 初期画像 = スマイリー
+  sampleBtnsDiv.children[7].click();
+});
+</script>
+</body>
+</html>
